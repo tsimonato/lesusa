@@ -1,0 +1,12 @@
+# 10 deciles -> 5 quintiles
+decile,HH
+1,Q1
+2,Q1
+3,Q2
+4,Q2
+5,Q3
+6,Q3
+7,Q4
+8,Q4
+9,Q5
+10,Q5

@@ -1,0 +1,4 @@
+^data-raw$
+^\.Rbuildignore$
+^CITATION\.cff$
+^LICENSE\.md$

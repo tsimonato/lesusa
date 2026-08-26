@@ -1,0 +1,53 @@
+# map each state (51) to your model region
+state,REG
+Alabama,TODO
+Alaska,TODO
+Arizona,TODO
+Arkansas,TODO
+California,TODO
+Colorado,TODO
+Connecticut,TODO
+Delaware,TODO
+District of Columbia,TODO
+Florida,TODO
+Georgia,TODO
+Hawaii,TODO
+Idaho,TODO
+Illinois,TODO
+Indiana,TODO
+Iowa,TODO
+Kansas,TODO
+Kentucky,TODO
+Louisiana,TODO
+Maine,TODO
+Maryland,TODO
+Massachusetts,TODO
+Michigan,TODO
+Minnesota,TODO
+Mississippi,TODO
+Missouri,TODO
+Montana,TODO
+Nebraska,TODO
+Nevada,TODO
+New Hampshire,TODO
+New Jersey,TODO
+New Mexico,TODO
+New York,TODO
+North Carolina,TODO
+North Dakota,TODO
+Ohio,TODO
+Oklahoma,TODO
+Oregon,TODO
+Pennsylvania,TODO
+Rhode Island,TODO
+South Carolina,TODO
+South Dakota,TODO
+Tennessee,TODO
+Texas,TODO
+Utah,TODO
+Vermont,TODO
+Virginia,TODO
+Washington,TODO
+West Virginia,TODO
+Wisconsin,TODO
+Wyoming,TODO

@@ -1,0 +1,53 @@
+# 51 states -> 9 census divisions
+state,REG
+Alabama,ES_Central
+Alaska,Pacific
+Arizona,Mountain
+Arkansas,WS_Central
+California,Pacific
+Colorado,Mountain
+Connecticut,New_England
+Delaware,S_Atlantic
+District of Columbia,S_Atlantic
+Florida,S_Atlantic
+Georgia,S_Atlantic
+Hawaii,Pacific
+Idaho,Mountain
+Illinois,EN_Central
+Indiana,EN_Central
+Iowa,WN_Central
+Kansas,WN_Central
+Kentucky,ES_Central
+Louisiana,WS_Central
+Maine,New_England
+Maryland,S_Atlantic
+Massachusetts,New_England
+Michigan,EN_Central
+Minnesota,WN_Central
+Mississippi,ES_Central
+Missouri,WN_Central
+Montana,Mountain
+Nebraska,WN_Central
+Nevada,Mountain
+New Hampshire,New_England
+New Jersey,Mid_Atlantic
+New Mexico,Mountain
+New York,Mid_Atlantic
+North Carolina,S_Atlantic
+North Dakota,WN_Central
+Ohio,EN_Central
+Oklahoma,WS_Central
+Oregon,Pacific
+Pennsylvania,Mid_Atlantic
+Rhode Island,New_England
+South Carolina,S_Atlantic
+South Dakota,WN_Central
+Tennessee,ES_Central
+Texas,WS_Central
+Utah,Mountain
+Vermont,New_England
+Virginia,S_Atlantic
+Washington,Pacific
+West Virginia,S_Atlantic
+Wisconsin,EN_Central
+Wyoming,Mountain
