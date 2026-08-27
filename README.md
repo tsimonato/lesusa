@@ -124,8 +124,11 @@ published composition to 1e-12. Know what you are buying:
 The parameters ship as release cut `frisch_friedman_v1.3.0-tier2` of the
 LES-USA project (2017-2019 CEX window). The build script md5-gates every
 input against the cut's `MANIFEST.csv`; the source checksums ride in
-`les_data()$meta$source_md5`. Rebuild from the shipped files:
-`data-raw/build_les_usa_rds.R`. Test suite: `Rscript tests/run_all.R`.
+`les_data()$meta$source_md5`. Two demographic inputs come from the pipeline
+rather than from the cut, so the manifest cannot cover them; they are pinned by
+md5 in the build script and recorded in `les_data()$meta$pipeline_md5`. Rebuild
+from the shipped files: `data-raw/build_les_usa_rds.R`. Test suite:
+`Rscript tests/run_all.R`.
 
 Estimation methodology, identification and validation are documented in
 the companion paper (see `CITATION.cff`); the paper, not this README, is

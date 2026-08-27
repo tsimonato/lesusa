@@ -37,6 +37,18 @@ CUT_FILES <- c(
   fmarg   = "v0.8_fam6_margins_2017-2019.csv",
   fmass   = "v0.8_cell_mass_state_inc10_age5_fam6_2017-2019.csv")
 
+# Two demographic inputs come from the pipeline, not from the cut, so
+# MANIFEST.csv cannot cover them. They are pinned here by md5 instead: without
+# this the shipped .rds carried person counts and equivalence scales from
+# whatever happened to sit in estimation/inputs, and meta$source_md5 recorded
+# no trace of them (codex round 20260826_audit, C2).
+EXTRA_INPUTS <- c(
+  "estimation/inputs/cu_group_money_2017_2019.csv" =
+    "b0e60418a0916191a7cb30d32bd389f2",
+  "estimation/inputs/axis_sidecar_2017_2019.csv"   =
+    "87ee0d19683c2e38f9af1b6f6941885e")
+stopifnot(setequal(names(EXTRA_INPUTS), c(p_backbone, p_sidecar)))
+
 ## ---------------------------------------------------------------- md5 gate --
 manifest <- fread(file.path(cut_dir, "MANIFEST.csv"))
 for (f in CUT_FILES) {
@@ -47,7 +59,16 @@ for (f in CUT_FILES) {
     stop("md5 mismatch for ", f, ": manifest ", want, " vs on-disk ", got,
          " -- refusing to build from a corrupted cut.")
 }
-cat("md5 gate: ", length(CUT_FILES), " cut files match MANIFEST.csv\n", sep = "")
+extra_md5 <- vapply(names(EXTRA_INPUTS), \(f) {
+  got <- unname(tools::md5sum(f))
+  if (is.na(got)) stop("missing pipeline input: ", f)
+  if (!identical(got, unname(EXTRA_INPUTS[[f]])))
+    stop("md5 mismatch for ", f, ": pinned ", EXTRA_INPUTS[[f]],
+         " vs on-disk ", got, " -- refusing to build from a drifted input.")
+  got
+}, character(1))
+cat("md5 gate: ", length(CUT_FILES), " cut files match MANIFEST.csv; ",
+    length(EXTRA_INPUTS), " pipeline inputs match their pins\n", sep = "")
 
 ## ------------------------------------------------------------------- inputs --
 cube <- fread(file.path(cut_dir, CUT_FILES["cube"]))
@@ -179,6 +200,12 @@ meta <- list(
   window      = "2017-2019",
   n_cu_total  = sum(cells$N_cu),
   source_md5  = as.data.frame(manifest[file %in% CUT_FILES]),
+  # kept separate from source_md5: these two are pipeline inputs resolved from
+  # the repo root, not entries of the release cut, and the package's t01 walks
+  # source_md5 relative to CUT_DIR
+  pipeline_md5 = data.frame(file = names(extra_md5), md5 = unname(extra_md5),
+                            role = c("demographic backbone", "state/age sidecar"),
+                            row.names = NULL),
   weight_contract = paste(
     "D-072-02: across cells, N and M_bar and gamma aggregate by w_cu",
     "(CU mass); beta aggregates by w_sup (supernumerary mass,",
