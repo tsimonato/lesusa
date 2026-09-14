@@ -6,14 +6,14 @@ authors:
   - family-names: Simonato
     given-names: Thiago
     email: thiago.c.simonato@gmail.com
-version: 0.1.1
-date-released: "2026-08-26"
+version: 0.2.0
+date-released: "2026-09-13"
 license: MIT
 repository-code: "https://github.com/tsimonato/lesusa"
 abstract: >-
   Theoretically consistent Linear Expenditure System (Stone-Geary)
   parameters for the United States, 2017-2019, on a 51 state x 10 income
   decile x 5 age grid over 42 goods (release cut
-  frisch_friedman_v1.3.0-tier2), with one aggregation function that is
+  frisch_friedman_v1.4.0-tier2), with one aggregation function that is
   exact at the base point and re-derives elasticities from closed forms.
 # DOI pending: to be minted at first public release (spec 073 AC11).

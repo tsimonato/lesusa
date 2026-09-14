@@ -1,12 +1,13 @@
 # t02 -- AC3: identity aggregation reproduces the shipped elasticity matrix
-# to 1e-8 on all 107,100 rows, INCLUDING the 1,781 flag_zero rows (which is
-# why flagged = "keep" exists).
+# to 1e-8 on all 107,100 rows. Through v0.9 that set included 1,781 flag_zero
+# rows, which is why flagged = "keep" exists; at v1.0 there are none, and the
+# test asserts that too rather than quietly losing the coverage.
 les <- les_data()
 if (!dir.exists(CUT_DIR)) {
   cat("t02 SKIP: release cut not found at ", CUT_DIR, "\n", sep = "")
 } else {
   em <- utils::read.csv(file.path(
-    CUT_DIR, "v0.7_elasticity_matrix_state_inc10_age5_2017-2019.csv"))
+    CUT_DIR, "v1.2_elasticity_matrix_state_inc10_age5_2017-2019.csv"))
   stopifnot(nrow(em) == 107100L)
   gmap <- data.frame(good = les$goods$good, COM = les$goods$good,
                      stringsAsFactors = FALSE)
@@ -14,8 +15,12 @@ if (!dir.exists(CUT_DIR)) {
                      state = les$cells$state,
                      HH = paste0("c", les$cells$cell_id),
                      stringsAsFactors = FALSE)
-  res <- suppressWarnings(
-    les_aggregate(goods = gmap, household = hmap, flagged = "keep"))
+  # The default call: this is the identity partition, so the output rows ARE
+  # the native rows, and the v1.2 construction band of 4.89 keeps every one of
+  # them under the export ceiling of 5 (ETA_EXPORT) with room for the 4-dp
+  # rounding of gamma. No opt-out -- if this ever needs eta_over, the band and
+  # the ceiling have drifted apart again.
+  res <- les_aggregate(goods = gmap, household = hmap, flagged = "keep")
   out <- res$par
   stopifnot(nrow(out) == 107100L)
   ci  <- match(out$HH, paste0("c", les$cells$cell_id))
@@ -28,6 +33,8 @@ if (!dir.exists(CUT_DIR)) {
            eps = max(abs(out$eps_own - em$eps_own[j])))
   stopifnot(all(dev <= 1e-8))
   stopifnot(identical(as.integer(out$flag_zero), as.integer(em$flag_zero[j])))
+  # v1.0: x > 0 is an identity of the construction, so nothing is flagged.
+  stopifnot(sum(out$flag_zero) == 0L, all(out$x > 0))
   # cell level: S and phi
   cl <- res$cells
   ci2 <- match(cl$HH, paste0("c", les$cells$cell_id))

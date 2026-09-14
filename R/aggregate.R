@@ -19,17 +19,52 @@
 #' @param per report levels per "cu" (default), "capita" or "adult_equiv".
 #'   Divides gamma, M_bar, x, Gamma only; shares and elasticities untouched.
 #' @param flagged what to do when an aggregated x_G <= 0: "error" (default),
-#'   "keep" (algebraic passthrough with flag_zero = 1, exactly what the
-#'   shipped elasticity matrix does for its own 1,781 flagged rows), or
-#'   "renormalize" (floor at 0, warn, report the adding-up break).
+#'   "keep" (algebraic passthrough with flag_zero = 1), or "renormalize"
+#'   (floor at 0, warn, report the adding-up break). Since the v1.0 cube
+#'   (release cut `frisch_friedman_v1.6.0-tier2`, cube v1.2) every NATIVE row
+#'   has x > 0 by construction and eta = beta/w <= 4.89 (the construction band
+#'   of 2026-09-14), so this
+#'   never fires on the shipped inputs: exact aggregation of positive native
+#'   rows keeps every output x_G positive. The argument exists for
+#'   alternative or invalid inputs.
 #' @param cross_price also return/check the full cross-price block.
+#' @param eta_over what to do when an output row's eta = beta/w exceeds the
+#'   export ceiling `ETA_EXPORT` (5): "error" (default) stops before anything
+#'   is returned or written, naming the worst rows; "warn" returns the exact
+#'   aggregates with a warning; "keep" returns them silently. In every mode
+#'   `audit$n_eta_above` and `audit$eta_max` carry the count and the maximum.
 #' @return (invisibly) list(par, cells, audit) and, if requested, `cross`.
+#' @section The export band on eta:
+#'   Two numbers, and they answer different questions. Every native row has
+#'   `eta = beta/w <= 4.89` by construction (the construction band). Exports
+#'   are exact aggregates of those rows, not bounded copies of them: an
+#'   aggregate weights beta by supernumerary mass and x by CU mass, so merging
+#'   cells whose share of a luxury rises with the budget lifts the aggregate
+#'   above the largest row it merges -- by up to 7.2% on this cube. So the
+#'   band does not mechanically deliver the export ceiling `ETA_EXPORT` (5).
+#'   Of the 178 classifications the release sweep drives (the shipped
+#'   correspondences plus the maps built from the cube's own keys), 16 come
+#'   out above 5, all of them merging across income deciles inside a state;
+#'   the worst is `g42 x r51 x q_fam6` at 5.24. The CGE grid (16 goods x 51
+#'   states x 10 deciles) stays under, at 4.96. A two-cell merge of very
+#'   different budgets can go further still.
+#'   What is guaranteed is therefore not that no aggregate exceeds 5, but that
+#'   none is handed to you quietly: the function re-checks `eta` on every
+#'   output row and, by default, **refuses** the call
+#'   (`eta_over = "error"`), naming the rows, when any exceeds `ETA_EXPORT`.
+#'   Nothing above the ceiling is returned or written unless you ask:
+#'   `eta_over = "warn"` or `"keep"` opts into the exact aggregates, which are
+#'   never altered. Coarsen or split the map differently, or opt in
+#'   knowingly. The count is in `audit$n_eta_above` and the maximum in
+#'   `audit$eta_max`.
 #' @export
 les_aggregate <- function(goods = NULL, regions = NULL, household = NULL,
                           file = NULL, per = c("cu", "capita", "adult_equiv"),
                           flagged = c("error", "keep", "renormalize"),
-                          cross_price = FALSE) {
-  per     <- match.arg(per)
+                          cross_price = FALSE,
+                          eta_over = c("error", "warn", "keep")) {
+  per      <- match.arg(per)
+  eta_over <- match.arg(eta_over)
   flagged <- match.arg(flagged)
   les <- les_data()
 
@@ -187,6 +222,32 @@ les_aggregate <- function(goods = NULL, regions = NULL, household = NULL,
   } else {
     out$eta     <- out$beta / out$w
     out$eps_own <- -1 + (1 - out$beta) * out$gamma / out$x
+  }
+
+  ## ------------------------------------------------- export band on eta ---
+  # Checked at the point of use, for whatever partition was asked for; the
+  # sweep in tests/test_export_admissibility.R can only enumerate a finite
+  # list of maps. Flagged rows (x_G <= 0) are reported by the `flagged`
+  # branch above and are excluded here.
+  eta_ok <- is.finite(out$eta)
+  audit$eta_max     <- if (any(eta_ok)) max(out$eta[eta_ok]) else NA_real_
+  above             <- which(eta_ok & out$eta > ETA_EXPORT)
+  audit$n_eta_above <- length(above)
+  if (length(above)) {
+    top <- above[order(-out$eta[above])][seq_len(min(5L, length(above)))]
+    msg <- paste0(
+      length(above), " output row(s) have eta = beta/w above the export ",
+      "band of ", ETA_EXPORT, " (max ", format(audit$eta_max, digits = 4),
+      "). The values are exact aggregates of admissible native rows, ",
+      "but this partition mixes cells whose budgets differ too much for ",
+      "the good's share to stay in band; coarsen or split it differently",
+      if (eta_over == "error") ", or call with eta_over = \"warn\" to receive the exact aggregates anyway" else "",
+      ". Worst: ", paste(sprintf("%s/%s/%s eta=%.2f", out$REG[top], out$HH[top],
+                                 out$COM[top], out$eta[top]), collapse = "; "))
+    # The ceiling is enforced, not just checked: by default nothing above it
+    # is returned or written (codex round 20260913_v11_band, finding 1).
+    if (eta_over == "error") stop(msg, call. = FALSE)
+    if (eta_over == "warn")  warning(msg, call. = FALSE)
   }
 
   ## --------------------------------------------------------- audits -------

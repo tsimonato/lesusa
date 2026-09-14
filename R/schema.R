@@ -15,7 +15,8 @@ les_data <- function() {
   les <- readRDS(path)
 
   need <- c("par", "cells", "goods", "states",
-            "fam_tilts", "fam_margins", "fam_cells", "meta")
+            "fam_tilts", "fam_margins", "fam_cells",
+            "fam_logit", "fam_seed", "meta")
   miss <- setdiff(need, names(les))
   if (length(miss))
     stop("les_usa.rds is missing table(s): ", paste(miss, collapse = ", "),
@@ -25,6 +26,8 @@ les_data <- function() {
     nrow(les$goods) == 42L, nrow(les$states) == 51L,
     nrow(les$fam_tilts) == 480L, nrow(les$fam_margins) == 30L,
     nrow(les$fam_cells) == 15300L,
+    nrow(les$fam_logit) == 30L, nrow(les$fam_seed) == 480L,
+    all(les$fam_seed$seed_tilt > 0),
     !anyNA(les$par$beta), !anyNA(les$par$gamma),
     all(les$cells$N_cu >= 0), all(les$cells$M_bar > 0),
     all(les$cells$S_c > 0 & les$cells$S_c < 1))

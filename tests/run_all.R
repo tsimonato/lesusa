@@ -23,7 +23,7 @@ if (file.exists("R/aggregate.R")) {                       # source mode
   corr_dir <- system.file("correspondence", package = "lesusa")
 }
 corr_file <- function(f) file.path(corr_dir, f)
-CUT_DIR <- Sys.getenv("LESUSA_CUT", "../versions/frisch_friedman_v1.3.0-tier2")
+CUT_DIR <- Sys.getenv("LESUSA_CUT", "../versions/frisch_friedman_v1.6.0-tier2")
 
 case_dir <- if (dir.exists("tests/cases")) "tests/cases" else "cases"
 tests <- sort(list.files(case_dir, "^t[0-9]{2}.*\\.R$", full.names = TRUE))

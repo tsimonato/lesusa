@@ -1,11 +1,11 @@
 Package: lesusa
 Title: Stone-Geary (LES) Parameter Database for the United States with
     Exact Aggregation
-Version: 0.1.1
+Version: 0.3.0
 Authors@R:
     person("Thiago", "Simonato", email = "thiago.c.simonato@gmail.com",
            role = c("aut", "cre"))
-Description: Ships the frisch_friedman_v1.3.0-tier2 release of theoretically
+Description: Ships the frisch_friedman_v1.6.0-tier2 release of theoretically
     consistent Linear Expenditure System (Stone-Geary) parameters for the
     United States, 2017-2019, on a 51 state x 10 income decile x 5 age grid
     over 42 goods, together with one aggregation function. les_aggregate()
@@ -22,6 +22,7 @@ Encoding: UTF-8
 Depends:
     R (>= 4.1)
 Imports:
-    HARr (>= 1.1.0)
+    HARr (>= 1.1.0),
+    stats
 URL: https://github.com/tsimonato/lesusa
 BugReports: https://github.com/tsimonato/lesusa/issues

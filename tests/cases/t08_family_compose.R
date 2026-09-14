@@ -1,7 +1,10 @@
-# t08 -- the base-R RAS port honours the composer's own contract (spec 074 /
-# compose_cube_v08.R): exact row margin, 1e-12 column recombination,
+# t08 -- the base-R RAS port honours the composer's own contract (specs 074 and
+# 077 / compose_cube_v10.R): exact row margin, 1e-12 column recombination,
 # admissibility, SUP_MIN floor, mass collapse -- and it is provably NOT the
 # forbidden multiply-and-renormalize shortcut (CLAUDE.md rule 7).
+#
+# beta is the v0.8 construction and its checks are unchanged. gamma is the v1.0
+# transport, so check 7 adds what v1.0 buys: x > 0 on all 642,600 composed rows.
 les <- les_data()
 comp <- compose_fam(les)
 stopifnot(nrow(comp$par) == 642600L, nrow(comp$cells) == 15300L)
@@ -44,20 +47,33 @@ naive <- naive / rowsum(naive, les$par$cell_id)[
 b1 <- comp$par$beta[comp$par$fam6 == f1]
 stopifnot(max(abs(b1 - naive)) > 1e-3)
 
-# 6. end to end through the exported function. flagged = "keep": the family
-# layer inherits negative gammas, and at least one composed group
-# (e.g. Q4 x F6 x H16) carries a legitimate x_G <= 0 -- found by this test,
-# documented in the README.
+# 6. end to end through the exported function. Through v0.9 at least one
+# composed group (e.g. Q4 x F6 x H16) carried a legitimate x_G <= 0 and the
+# call had to be made with flagged = "keep". At v1.0 none does, so the same
+# call must now come back with nothing flagged at all.
 fam_map <- utils::read.csv(corr_file("household_quintile_x_fam6.csv"),
                            comment.char = "#")
-res <- suppressWarnings(les_aggregate(
+# The default call, no opt-out: quintile x fam6 x 16 goods mixes budgets across
+# the family axis, which lifted three rows past the ceiling while the band was
+# 5; at 4.89 the same partition lands under it.
+res <- les_aggregate(
   goods = utils::read.csv(corr_file("goods_42_to_16.csv"),
                           comment.char = "#"),
-  household = fam_map, flagged = "keep"))
+  household = fam_map, flagged = "keep")
 stopifnot(nrow(res$cells) == 30L,
           res$audit$max_dev_addup <= 1e-10,
           res$audit$level_repro_rel <= 1e-10,
-          sum(res$par$flag_zero) >= 1L)
+          sum(res$par$flag_zero) == 0L, all(res$par$x > 0))
+
+# 7. v1.0 admissibility on the composed object itself
+mb_row <- comp$cells$M_bar[match(paste(comp$par$cell_id, comp$par$fam6),
+                                 paste(comp$cells$cell_id, comp$cells$fam6))]
+gam_row <- gam_f[match(paste(comp$par$cell_id, comp$par$fam6),
+                       rownames(gam_f)), 1L]
+x_f <- comp$par$gamma + comp$par$beta * (mb_row - gam_row)
+stopifnot(length(x_f) == 642600L, all(is.finite(x_f)), all(x_f > 0))
+cat(sprintf("  ok: composed family cube has x > 0 in all %d rows (min $%.2f)\n",
+            length(x_f), min(x_f)))
 cat(sprintf(
   "t08 PASS: RAS port honours the composer contract (max naive-vs-RAS dev %.3f); fam end-to-end 30 groups\n",
   max(abs(b1 - naive))))

@@ -22,20 +22,33 @@ suppressPackageStartupMessages(library(data.table))
 
 args <- commandArgs(trailingOnly = TRUE)
 cut_dir <- if (length(args) >= 1) args[[1]] else
-  "release/versions/frisch_friedman_v1.3.0-tier2"
+  "release/versions/frisch_friedman_v1.6.0-tier2"
 out_rds <- if (length(args) >= 2) args[[2]] else
   "release/cge_bridge/inst/extdata/les_usa.rds"
 p_backbone <- "estimation/inputs/cu_group_money_2017_2019.csv"
 p_sidecar  <- "estimation/inputs/axis_sidecar_2017_2019.csv"
 
+# The four state x decile x age files move to v1.2 (spec 077): same schema,
+# admissible by construction on every axis, with eta = beta/w banded at 4.89 on
+# every native row, plus the fine regraft (fine expenditure re-closed on the
+# observed layer-0 share) and the precision-triggered donor repair (decision
+# 2026-09-14; v1.0 banded at 10, v1.1 at 4, both superseded). The band is the
+# construction band and 5 is the export ceiling: they are different numbers
+# because exact aggregation can exceed its inputs (up to 7.2% here), so 16 of
+# the 178 classifications the release sweep drives land above 5 and are refused
+# by default rather than returned quietly. The family layer
+# is unchanged and still ships under its v0.8 names -- v1.2 changes how it is
+# composed, not what it contains. fdonor is new to the cut: the package derives the family logit
+# tilt and the RAS seed from it, so it can no longer sit in the repo alone.
 CUT_FILES <- c(
-  cube    = "v0.7_les_fine_42good_state_inc10_age5_2017-2019.csv",
-  weights = "v0.7_weight_matrix_state_inc10_age5_2017-2019.csv",
-  mass    = "v0.7_cell_mass_state_inc10_age5_2017-2019.csv",
-  tier    = "v0.7_state_tier_map.csv",
+  cube    = "v1.2_les_fine_42good_state_inc10_age5_2017-2019.csv",
+  weights = "v1.2_weight_matrix_state_inc10_age5_2017-2019.csv",
+  mass    = "v1.2_cell_mass_state_inc10_age5_2017-2019.csv",
+  tier    = "v1.2_state_tier_map.csv",
   ftilt   = "v0.8_fam6_tilt_layer_2017-2019.csv",
   fmarg   = "v0.8_fam6_margins_2017-2019.csv",
-  fmass   = "v0.8_cell_mass_state_inc10_age5_fam6_2017-2019.csv")
+  fmass   = "v0.8_cell_mass_state_inc10_age5_fam6_2017-2019.csv",
+  fdonor  = "v0.8_pooled_knownvar_les_fam6xq5_2017-2019.csv")
 
 # Two demographic inputs come from the pipeline, not from the cut, so
 # MANIFEST.csv cannot cover them. They are pinned here by md5 instead: without
@@ -78,9 +91,10 @@ tier <- fread(file.path(cut_dir, CUT_FILES["tier"]))
 ftilt <- fread(file.path(cut_dir, CUT_FILES["ftilt"]))
 fmarg <- fread(file.path(cut_dir, CUT_FILES["fmarg"]))
 fmass <- fread(file.path(cut_dir, CUT_FILES["fmass"]))
+fdon  <- fread(file.path(cut_dir, CUT_FILES["fdonor"]))
 stopifnot(nrow(cube) == 107100L, nrow(wm) == 2550L, nrow(mass) == 2550L,
           nrow(tier) == 51L, nrow(ftilt) == 480L, nrow(fmarg) == 30L,
-          nrow(fmass) == 15300L)
+          nrow(fmass) == 15300L, nrow(fdon) == 480L)
 
 # Naming-trap normalization at the door (spec D2): cube says age5, companions
 # say age -> schema says age; tier map keys plain FIPS -> schema GeoFIPS x1000.
@@ -192,6 +206,37 @@ if (dev_abs > 0.031)
 cat(sprintf("fam mass collapse: max|sum_f N_cu_f - N_cu| = %.4f (2dp floor)\n",
             dev_abs))
 
+# The v1.0 gamma transport reads two things the tilt layer does not carry: the
+# family logit tilt t(q,f) and the RAS seed. Both are functions of the fam6xq5
+# donor alone, so they are derived once here rather than shipping the donor's
+# raw estimates and re-deriving them at call time. Same algebra as
+# R/recover/compose_cube_v10.R -- logit_tilt() is mean-zero under the donor's
+# own mass, and the seed is the donor's relative expenditure at its 16 parents.
+fdon[, `:=`(fam6 = cell_id %/% 10L, q = cell_id %% 10L)]
+fq <- merge(fdon[, .(G = sum(gamma)), by = .(cell_id, fam6, q)],
+            unique(fdon[, .(cell_id, n_cu, mbar)]), by = "cell_id")
+fq[, S_fq := G / mbar]
+stopifnot(all(fq$S_fq > 0), all(fq$S_fq < 1), all(fq$n_cu > 0))
+fq[, tilt := {
+  l <- qlogis(S_fq); l - sum(n_cu * l) / sum(n_cu)
+}, by = q]
+fam_logit <- fq[order(q, fam6), .(q, fam6, tilt)]
+stopifnot(nrow(fam_logit) == 30L,
+          fq[, abs(sum(n_cu * tilt) / sum(n_cu)), by = q][, max(V1)] < 1e-9)
+
+fd2 <- merge(fdon, fq[, .(cell_id, G)], by = "cell_id")
+fd2[, x_fq := gamma + beta_pp * (mbar - G)]
+xp <- fd2[, .(x_fq = x_fq, parent = good, fam6, q)]
+xp <- merge(xp, xp[, .(x_q = mean(x_fq)), by = .(q, parent)],
+            by = c("q", "parent"))
+xp[, seed_tilt := fifelse(x_fq > 0 & x_q > 0, x_fq / x_q, 1)]
+fam_seed <- xp[order(q, fam6, parent), .(q, fam6, parent, seed_tilt)]
+stopifnot(nrow(fam_seed) == 480L, all(fam_seed$seed_tilt > 0),
+          setequal(fam_seed$parent, unique(fam_tilts$parent)))
+cat(sprintf("fam donor: tilt [%.4f, %.4f] | seed_tilt [%.4f, %.4f]\n",
+            min(fam_logit$tilt), max(fam_logit$tilt),
+            min(fam_seed$seed_tilt), max(fam_seed$seed_tilt)))
+
 ## -------------------------------------------------------------------- meta --
 meta <- list(
   schema_version = "1.0",
@@ -219,9 +264,24 @@ meta <- list(
     "(differences up to 0.165 in absolute beta)."),
   honesty = paste(
     "R2: no standard errors ship on the cube grid; only state-level S_M",
-    "carries an SE. R3: 1,781 of 107,100 rows have x_g < 0 at base prices",
-    "(negative inherited gamma); coarse aggregation absorbs them but the",
-    "count is always reported. R5: ten states are 100% IPF-placed (no CEX",
+    "carries an SE. R3: 0 of 107,100 rows have x_g <= 0 at base prices and",
+    "0 of 642,600 rows of the composed family cube do (spec 077: the cube",
+    "transports the subsistence share and derives gamma, so x > 0 holds by",
+    "construction; through v0.9 it was 1,781 rows). gamma may still be",
+    "negative where a good has no subsistence floor -- that is inherited from",
+    "the donors and is not an admissibility violation. R4: eta = beta/w is",
+    "at most 4.89 on every native row of every axis, by construction",
+    "(ETA_MAX). Exports are exact aggregates of those rows, not bounded copies",
+    "of them: mixing weightings can push an aggregate above its native inputs",
+    "(measured up to 7.2% over the 178 classifications the release sweep",
+    "drives), so the construction band does not deliver the export ceiling of",
+    "5 (ETA_EXPORT) mechanically: 16 of those 178 exceed it, all merging across",
+    "income deciles inside a state (worst g42 x r51 x q_fam6 at 5.24); the CGE",
+    "grid stays under at 4.96. What is guaranteed is that none reaches a caller",
+    "silently -- les_aggregate() re-checks eta on every row it returns and",
+    "refuses above the ceiling by default, so those 16 require an explicit",
+    "eta_over = 'warn'/'keep'. R5: ten states are",
+    "100% IPF-placed (no CEX",
     "interviews); share_ipf_state reaches the output as a mass-weighted",
     "share. Family layer: calibrated composition from the 30-cell fam6xq5",
     "donor; w_fq is national; cite the donor, never the composed cube."),
@@ -230,14 +290,16 @@ meta <- list(
     "everywhere, including the tier map (re-keyed on entry)."),
   citation = paste(
     "Simonato, T. (2026). LES-USA: Stone-Geary parameter database for the",
-    "United States, 2017-2019 (frisch_friedman_v1.3.0-tier2). DOI pending."))
+    "United States, 2017-2019 (frisch_friedman_v1.6.0-tier2). DOI pending."))
 
 ## ----------------------------------------------------------- AC4 self-check --
 les <- list(par = as.data.frame(par), cells = as.data.frame(cells),
             goods = as.data.frame(goods), states = as.data.frame(st),
             fam_tilts = as.data.frame(fam_tilts),
             fam_margins = as.data.frame(fam_margins),
-            fam_cells = as.data.frame(fam_cells), meta = meta)
+            fam_cells = as.data.frame(fam_cells),
+            fam_logit = as.data.frame(fam_logit),
+            fam_seed = as.data.frame(fam_seed), meta = meta)
 
 # round-trip: schema columns must be the source columns, value-identical
 rt <- merge(as.data.table(les$par),
