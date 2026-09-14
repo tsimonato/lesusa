@@ -1,190 +1,174 @@
 # lesusa
 
-Stone-Geary (LES) demand parameters for the United States, 2017-2019, with
-one aggregation function that is exact at the base point.
+**Stone-Geary (LES) demand parameters for the United States, with aggregation that is exact at the base point.**
 
-The package ships the `frisch_friedman_v1.5.0-tier2` release of the LES-USA
-parameter database: 51 states x 10 income deciles x 5 age groups (2,550
-cells), 42 goods per cell, plus cell masses, an optional family-formation
-layer, and per-cell demographics. `les_aggregate()` maps that grid to *your*
-model's goods, regions and household types.
+[![Version](https://img.shields.io/badge/version-0.3.0-blue)](NEWS.md)
+[![R](https://img.shields.io/badge/R-%E2%89%A5%204.1-276DC3?logo=r)](https://www.r-project.org/)
+[![Release cut](https://img.shields.io/badge/cut-frisch__friedman__v1.6.0--tier2-6f42c1)](#provenance)
+[![Code](https://img.shields.io/badge/code-MIT-green)](LICENSE)
+[![Data](https://img.shields.io/badge/data-CC%20BY%204.0-green)](LICENSE.md)
 
-## Installation
+A calibrated Linear Expenditure System for 2,550 US household cells and 42 goods, estimated on the
+2017-2019 Consumer Expenditure Survey, with one function that collapses the grid to whatever
+classification your model uses. The aggregation is not an average: it reproduces aggregate demand
+with no error and preserves adding-up, Engel aggregation, homogeneity and the Cournot condition by
+construction.
+
+Built for CGE and microsimulation work. Writes GEMPACK `.har` directly.
+
+---
+
+## Install
 
 ```r
 # install.packages("remotes")
 remotes::install_github("tsimonato/lesusa")
 ```
 
-The package has no compiled code and no hard dependencies beyond base R
-(R >= 4.1). Writing `.har` files for GEMPACK models needs no extra
-software; the writer is internal.
-
-## What is guaranteed
-
-- **Exact at the base point.** The aggregated LES reproduces aggregate demand
-  of the disaggregated system with no approximation error: subsistence gamma
-  and mean outlay aggregate by CU mass, marginal shares beta by supernumerary
-  mass. Adding-up, Engel aggregation, homogeneity and Cournot hold by
-  construction; every call audits them (1e-10) and refuses to return an
-  inconsistent result.
-- **Derived quantities are re-derived, never averaged.** Budget shares,
-  income and price elasticities and the Frisch parameter come from the LES
-  closed forms evaluated at the aggregated parameters.
-- **Nothing silent.** Incomplete or ambiguous correspondences are errors that
-  name the offending elements. Illegal GEMPACK names are rejected, not
-  renamed.
-
-## What is NOT preserved (read before using)
-
-- **Behaviour away from the base point.** Aggregation is exact at base prices
-  and outlays; away from the point, the aggregate LES is an approximation
-  like any representative-consumer construction.
-- **Standard errors.** The cube grid carries none; only the state-level
-  subsistence share `S_M` has an SE (in the `states` table). Do not attach
-  inferential language to aggregated parameters.
-- **Every native row has x_g > 0.** Through v0.9 the cube derived expenditure
-  from a primitive gamma and 1,781 of 107,100 rows came out non-positive; the
-  claim made here then, that coarse aggregation absorbs them, was wrong — an
-  audit found 3.1% reaching the exported file. The v1.0 cube transports the
-  subsistence share and derives gamma, so the count is now **0 of 107,100**,
-  and 0 of the 642,600 composed family rows. `n_neg_absorbed` still reports it.
-  Exact aggregation of positive native rows keeps every output x_G positive;
-  `flagged` (below) only matters for alternative or invalid inputs.
-- **Every native row has eta = beta/w <= 4.89 by construction; exports are
-  exact aggregates of those rows, and anything above 5 is refused rather than
-  returned quietly.** Those are two different promises, and the difference is
-  not a hedge. `x > 0` makes eta positive but not bounded: an early v1.0 build
-  carried eta up to 2,328 on rows whose expenditure had collapsed to ~1% of the
-  parent cell's, and the band of 10 that fixed it still let the national decile
-  donor's own outlier through (recreation in decile 2 at eta 10.6, a marginal
-  budget share of 0.78 on an average share of 0.07). v1.1 clamped that donor at
-  the band, which cured the symptom and moved the excess onto the other goods:
-  it quintupled the income elasticity of food in decile 2 and flattened a
-  precisely estimated vehicle plateau. v1.2 repairs the donor at the source
-  instead, so the band is left with one job — stopping `x` from collapsing
-  inside the state, age and family splits — and binds on `x`, never on `beta`.
-  Exports are then exact aggregates, not bounded copies: aggregation weights
-  beta by supernumerary mass and x by CU mass, so where a luxury's share rises
-  with the budget across the merged cells the aggregate can carry a higher eta
-  than any row it merges. On this cube that excess reaches **7.2%**, which is
-  why 4.89 does not mechanically deliver 5. The repo's sweep
-  (`tests/test_export_admissibility.R`) drives 178 classifications — the
-  shipped correspondences plus the identity and intermediate maps built from
-  the cube's own keys — and **16 of them exceed 5**, all merging across income
-  deciles inside a state; the worst is `g42 x r51 x q_fam6` at 5.24, followed
-  by `g16 x r51 x q_fam6` (5.21), `g16` and `g42` x `r51` x `age5` / `age3`
-  (5.18) and `g42 x r51 x dec_fam6` (5.06). The CGE grid that `usa-ia` reads,
-  16 goods x 51 states x 10 deciles, stays under at **4.96**. A two-cell merge
-  of very different budgets can go further still. So the guarantee is about
-  what reaches you, not about what exists: `les_aggregate()` recomputes eta on
-  every row it returns and, by default, **stops** before returning or writing
-  anything, naming the worst rows, when any exceeds 5. To obtain one of those
-  16 classifications you must ask for it — `eta_over = "warn"` returns the
-  exact aggregates with a warning, `eta_over = "keep"` returns them silently —
-  and in every mode the count and maximum are in `audit$n_eta_above` and
-  `audit$eta_max`. Values are never altered. Coarsen or split the map
-  differently, or opt in knowingly.
-- **gamma can still be negative** on a good with no subsistence floor. That is
-  inherited from the donors and is not an admissibility violation: LES needs
-  x > 0 and a positive supernumerary budget, and both hold everywhere.
-- **Ten states have no CEX interviews.** Their cells are IPF-placed;
-  `share_ipf` reaches the output as a mass-weighted share. Treat
-  high-`share_ipf` groups as model-based, not survey-based.
-- **The family axis is a calibrated composition** (see below), not an
-  estimated dimension.
+No compiled code, no hard dependency beyond base R. `HARr` is needed only to write `.har`.
 
 ## Quickstart
 
 ```r
 library(lesusa)
 
-# built-in worked examples (see inst/correspondence/)
 cdir <- system.file("correspondence", package = "lesusa")
-g16  <- read.csv(file.path(cdir, "goods_42_to_16.csv"),  comment.char = "#")
-r4   <- read.csv(file.path(cdir, "regions_51_to_4.csv"), comment.char = "#")
-hq   <- read.csv(file.path(cdir, "household_decile_to_quintile.csv"),
-                 comment.char = "#")
+g16  <- read.csv(file.path(cdir, "goods_42_to_16.csv"),             comment.char = "#")
+hq   <- read.csv(file.path(cdir, "household_decile_to_quintile.csv"), comment.char = "#")
+r4   <- read.csv(file.path(cdir, "regions_51_to_4.csv"),            comment.char = "#")
 
-res <- les_aggregate(goods = g16, regions = r4, household = hq,
-                     file = "les_16x4x5", cross_price = TRUE)
-str(res$audit)   # the proof the call is consistent
+res <- les_aggregate(goods = g16, regions = r4, household = hq)
+#> les_aggregate: 20 output cells x 16 goods | max|sum beta - 1| = 6.7e-16 | level repro = 0.0e+00
+
+head(res$par)     # beta, gamma, x, w, eta, eps_own per output cell and commodity
+head(res$cells)   # N_cu, M_bar, Gamma, SUP, S, phi, demographics
+res$audit         # the checks the call ran on itself
 ```
 
-This writes `les_16x4x5.har` (GEMPACK: headers `BETA`, `GAMM`, `XEXP`,
-`WSHR`, `ETA`, `EOWN` over COM x REG x HH; `FRSC`, `SUBS`, `MEXP`, `NCU`
-over REG x HH; `ECRS` for cross-price) plus `les_16x4x5.csv` and
-`les_16x4x5_cells.csv`. The `.har` stores 4-byte reals; exact values live in
-the CSVs.
+A correspondence is a data frame, a CSV path or a named vector. Omit a dimension and it collapses.
+Pass `file = "mymodel"` to write `mymodel.har`, `mymodel.csv` and `mymodel_cells.csv`.
+
+## The grid
+
+| Dimension | Resolution | Native key |
+| --- | --- | --- |
+| Geography | 50 states and DC | `state` |
+| Income | 10 deciles of disposable income | `decile` |
+| Age | 5 bands of the reference person | `age` |
+| Goods | 42, nested under 16 groups | `good` |
+| Family (opt-in) | 6 formation types | `fam` |
+
+2,550 cells times 42 goods is 107,100 parameter rows. Asking for `fam` composes a sixth axis at call
+time and yields 642,600, never stored on disk.
+
+The window is 2017-2019, pooled. The cells carry survey weights summing to 138.7 million consumer
+units.
+
+## What is exact, and what is not
+
+The aggregation is exact **at the base point**, which is a precise and limited claim. Subsistence
+and mean outlay aggregate by consumer-unit mass, marginal budget shares by supernumerary mass, and
+every derived quantity is recomputed from the closed forms rather than averaged. The aggregated
+system therefore reproduces the disaggregated demand at observed prices and budgets, not away from
+them.
+
+Every call audits itself and refuses to return an inconsistent result. Measured on the shipped
+release:
+
+| Identity | Residual |
+| --- | --- |
+| Adding-up, `max abs(sum_g beta - 1)` | 6.7e-16 |
+| Engel aggregation, `sum_g w_g eta_g = 1` | 6.7e-16 |
+| Level reproduction | 0.0e+00 |
+| Homogeneity (`cross_price = TRUE`) | 8.9e-16 |
+| Cournot (`cross_price = TRUE`) | 1.4e-16 |
+
+Measured on the 16-good by 4-region by quintile call in the quickstart above. The audit tolerance
+is 1e-10, so the realised residuals sit four orders of magnitude inside it.
+
+Three things the cube is not, stated plainly because they are easy to assume:
+
+**It is a calibrated composition, not a 51-state estimation.** Formal inference lives in the donor
+systems: a national income-decile LES and a 41-state layer, both estimated by constrained NLSUR.
+The state, age and family axes are transported onto that base by a logit level and biproportional
+fitting. Column `tier` grades every cell by how much survey it rests on: 22 states are `T1`, 19 are
+`T2`, and the 10 with no CEX interviews at all are `T3`, placed by iterative proportional fitting.
+`share_ipf` carries into the output as a mass-weighted share, so a merged cell tells you how much
+of itself came from that route. Treat high-`share_ipf` groups as model-based, not survey-based.
+
+**Negative `gamma` is legitimate.** It appears on 10.1% of the 107,100 native rows, inherited from
+the donors, and it is not an admissibility violation: a good with no subsistence floor is allowed
+one. What LES actually requires is positive expenditure and a positive supernumerary budget, and
+both hold everywhere: zero of the 107,100 rows carry `x <= 0`, and `eps_own < 0` throughout.
+
+**No standard errors travel with the grid.** Only the state-level subsistence share `S_M` carries
+one, in the `states` table. Aggregated parameters are calibrated quantities, so do not attach
+inferential language to them: cite the donor tier for inference, never the composed cube.
+
+## The elasticity band, and what the package guarantees
+
+Positive expenditure bounds the income elasticity `eta = beta / w` below but not above. Where a
+cell's expenditure on a good is small, the ratio can run to three or four figures while every
+admissibility test still passes. The transport therefore holds a band, and the band binds on
+expenditure, never on `beta`, so adding-up and the estimated marginal shares are untouched.
+
+- **Native rows: `eta <= 4.89` by construction.**
+- **Exports: exact aggregates.** Aggregation weights `beta` by supernumerary mass and `x` by
+  consumer-unit mass, so a merged cell can exceed the largest row it merges. Across the 178
+  classifications the release sweep drives, that excess reaches 7.2%.
+- **`les_aggregate()` refuses, by default, to return or write any row above 5**, naming the
+  offending rows. Sixteen of those 178 classifications need an explicit `eta_over = "warn"` or
+  `"keep"`, and all sixteen merge across income deciles inside a single state. The 16-commodity by
+  51-state by 10-decile grid a CGE pipeline typically reads is not among them.
+
+The guarantee is that nothing above the ceiling is ever returned silently, not that nothing above
+it exists. Asking for the exact aggregate of an extreme partition is legitimate; receiving it
+without knowing is not.
 
 ## Correspondences
 
-A map is a CSV (or data.frame): native key column(s) plus one output column.
+Eight worked mappings ship in `inst/correspondence/`, each a CSV that lists native keys first and
+the output label last, with its provenance in the header: 42 goods to 16 or to 2, the 51 state rows
+to 9 census divisions or 4 regions, deciles to quintiles, ages to 3 bands, and two household
+crosses, which cross decile with age or with age and family. Write your own the same way. Every native
+element must map exactly once, and a violation is an error that names the offenders rather than a
+silent drop.
 
-| argument | native keys | output |
-|---|---|---|
-| `goods` | `good` (42 codes) | `COM` |
-| `regions` | `state` (51 names) | `REG` |
-| `household` | `decile`, `age`, optionally `state`, optionally `fam` | `HH` |
+## The family axis
 
-A missing map collapses its dimension to one element. Every native element
-must map exactly once; `state` can be claimed by `regions` or `household`,
-not both. Output labels must be GEMPACK-legal (`[A-Za-z][A-Za-z0-9_]*`,
-max 12 chars) if you write a `.har`.
-
-## The family axis (opt-in, with caveats)
-
-A household map claiming `fam` (see
-`household_quintile_x_fam6.csv`) composes the family-formation layer onto the
-cube at call time by biproportional fitting (RAS), reproducing the published
-composition. `beta` follows the v0.8 construction; `gamma` follows the v1.0
-transport, so the 642,600 composed rows are admissible too. Know what you are
-buying:
-
-- the layer is a **calibrated composition** from a 30-cell
-  (family x quintile) donor; `w_fq` is national, with no family x state,
-  family x age or family x region interaction. Cite the donor tier for
-  inference, never the composed cube;
-- composed groups can still carry negative gammas, but none prices a composite
-  at x_G <= 0 any more: through v0.9 e.g. Q4 x F6 x H16 did, and
-  `flagged = "keep"` was needed to get a result at all;
-- `per = "capita"` / `"adult_equiv"` are refused with `fam`: no per-family
-  persons measure exists, and the package does not invent one.
-
-## `flagged` and `per`
-
-- `flagged = "error"` (default): any output cell with x_G <= 0 stops the
-  call, naming the cells. `"keep"`: algebraic passthrough with
-  `flag_zero = 1`, exactly how the shipped elasticity matrix treats its own
-  flagged rows. `"renormalize"`: floors x at 0, warns, and reports the
-  adding-up break in the audit.
-- `per`: `"cu"` (default), `"capita"`, `"adult_equiv"` divide the levels
-  (gamma, M_bar, x, Gamma) by group means of persons or the OECD-modified
-  scale. Shares and elasticities are bit-identical across `per`.
+`fam` is opt-in and composed at call time from a factorized layer by biproportional fitting, not by
+multiplying a tilt onto `beta` and renormalizing. The two differ materially. Read the caveats in
+`?les_aggregate` before using it: `per` is restricted to consumer units on that axis, because no
+person count exists by family type and inventing one would be false precision.
 
 ## Provenance
 
-The parameters ship as release cut `frisch_friedman_v1.5.0-tier2` of the
-LES-USA project (2017-2019 CEX window). The build script md5-gates every
-input against the cut's `MANIFEST.csv`; the source checksums ride in
-`les_data()$meta$source_md5`. Two demographic inputs come from the pipeline
-rather than from the cut, so the manifest cannot cover them; they are pinned by
-md5 in the build script and recorded in `les_data()$meta$pipeline_md5`. Rebuild
-from the shipped files: `data-raw/build_les_usa_rds.R`. Test suite:
-`Rscript tests/run_all.R`.
+The parameters are release cut `frisch_friedman_v1.6.0-tier2` (cube v1.2). The build script
+md5-gates every input against the cut manifest and refuses to run on a drifted file. Checksums
+travel with the data:
 
-Estimation methodology, identification and validation are documented in
-the companion paper (see `CITATION.cff`); the paper, not this README, is
-the reference for how the numbers were produced.
+```r
+les <- lesusa:::les_data()
+les$meta$cut            # the release cut this rds was built from
+les$meta$source_md5     # every cut file, with its md5
+les$meta$pipeline_md5   # the two demographic inputs that sit outside the cut
+les$meta$honesty        # what the numbers do not support
+```
+
+`les_aggregate()` is the whole public API by design. The shipped tables are reachable through
+`lesusa:::les_data()` for inspection, and their schema is documented in the cut.
 
 ## Citation
 
-See `CITATION.cff` (GitHub renders it under "Cite this repository").
-An archived copy of each release receives a DOI via Zenodo; until the
-first DOI is minted, cite the release tag and the companion paper.
+```bibtex
+Simonato, T. (2026). LES-USA: Stone-Geary parameter database for the United States,
+2017-2019 (frisch_friedman_v1.6.0-tier2) [Data set and R package, version 0.3.0].
+https://github.com/tsimonato/lesusa
+```
+
+`CITATION.cff` carries the machine-readable form.
 
 ## License
 
-Code is released under the MIT license (`LICENSE.md`). The parameter
-files under `inst/` and `data/` are released under CC BY 4.0: use them
-freely, with attribution to the LES-USA project.
+Code MIT. Parameter files CC BY 4.0. The underlying microdata is the public-use Consumer
+Expenditure Survey from the Bureau of Labor Statistics and carries its own terms.
