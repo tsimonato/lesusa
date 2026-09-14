@@ -1,3 +1,85 @@
+# lesusa 0.3.0 (2026-09-14)
+
+New data. The package now ships the `frisch_friedman_v1.6.0-tier2` cut (cube
+v1.2), which supersedes the v1.5.0-tier2 cut (cube v1.1) that 0.2.0 shipped.
+**Parameter values change**: `les_aggregate()` does not return what 0.2.0
+returned. If you built a model on 0.2.0 output, rerun it. No estimation was
+re-run; the Stata NLSUR donors are the same, and the tier map and cell-mass
+matrix are byte-identical.
+
+- **Why.** Sweeping the aggregations a CGE user can request against the v1.1
+  cube found three plausibility defects that every admissibility gate had
+  passed. (1) The v1.1 donor cap spread recreation's excess marginal share in
+  proportion to budget shares, which adds the same constant (+0.52) to every
+  other group's eta in decile 2 and left food at 0.62 against neighbours of
+  0.39 and 0.44; the decile axis carried donor noise, not an Engel gradient.
+  (2) The band of 4 clipped a precisely estimated plateau: vehicle purchases
+  sits at eta 3.8 to 4.7 in decile 1 and deciles 3 to 9 (t from 4.8 to 13.0),
+  4,463 native rows sat at exactly 4.000 in 70% of cells, and the dispersion
+  of its eta across the 51 states fell from 0.245 to 0.109. (3) At the fine
+  42-good level, beef, pork, other meat, poultry, seafood and eggs together
+  came to $39 a year in decile 2 (0.13% of a $29,417 budget) against $1,260
+  in decile 8.
+- **Donor repair, by precision.** A national decile cell is flagged when its
+  standard error is 4 times the median standard error of the same group
+  across the ten deciles (`C_PRECISION`); the ratio over the 160 group cells
+  runs 8.04, 6.20, then 3.53, so any constant in (3.53, 6.20] picks the same
+  two cells, and a precisely estimated cell is never touched however high it
+  sits. The flagged cell takes the running median of three of its own income
+  profile and the other groups of that decile are rescaled by one common
+  factor (multiplicative replacement, Martin-Fernandez, Barcelo-Vidal and
+  Pawlowsky-Glahn 2003). Two of 160 cells moved: recreation in decile 2 (eta
+  10.63 to 1.79) and decile 4 (5.00 to 2.83). `x` and `w` are untouched;
+  `sum beta` and `sum gamma` hold at file precision.
+- **Fine graft closed on the observed share.** Fine expenditure is now
+  `x_item = x_G * s_i` with `s_i` the Diary layer-0 share (protein share of
+  food 0.225 to 0.210 across deciles, se at most 0.012), `beta_item`
+  unchanged and `gamma_item = x_item - beta_item * SUP`. Within each parent
+  the sums of `x`, `beta` and `gamma` are preserved exactly, so nothing
+  above the fine level moves through this change. Only the 18 food items are
+  affected; 213 of 290 fine rows moved; the smallest fine expenditure rises
+  from $2.56 to $32.83 a year and fine eta max falls from 13.20 to 4.70.
+- **Native band 4.89, export ceiling 5.** The band on native rows moves from
+  4 to 4.89 (`ETA_BAND_V12`), which clips nothing at the repaired donor
+  (maximum 4.70) and pins 1,052 rows against 998 before. The band still
+  binds on `x`, never on `beta`. The export ceiling stays at 5.
+- **Export behaviour above 5.** `les_aggregate()` still recomputes eta on
+  every row it returns and, by default (`eta_over = "error"`), stops before
+  returning or writing anything, naming the rows, when any exceeds 5;
+  `"warn"` and `"keep"` opt in. What changed is how often the default fires.
+  Exact aggregation weights `beta` by supernumerary mass and `x` by CU mass,
+  so a merged group's eta can exceed every row it merges; over the 178
+  listed classifications the excess now reaches 7.2% (down from 12.8% before
+  the donor repair), and **16 of the 178 export above 5** (5.24, 5.21, 5.18,
+  5.18, 5.18, 5.06 and on), all of them merging income deciles inside a
+  state. Those 16 need `eta_over = "warn"` or `"keep"`. The 16-good x
+  51-state x 10-decile grid the TERM pipeline reads stays under, at 4.96.
+- **Correction to the 0.2.0 entry below.** It says the export sweep "gates
+  eta at 5 on all of them (worst 4.51; 4.11 at the TERM export)" and that
+  "the shipped correspondences never trigger" the default stop. Both were
+  true of the v1.1 cube at a band of 4 and are no longer true: see the
+  previous item. A band that would keep all 178 under 5 is 4.66, below the
+  repaired donor's maximum, and was refused because it would clip the
+  vehicle plateau again.
+- **Measured on the shipped v1.2 files** (`tests/test_cube_v10_gates.R`, all
+  PASS): `x > 0` and `eps_own < 0` everywhere; eta max 4.8905 on the
+  107,100-row base cube and 4.8900 on the 642,600 composed family rows, 0
+  rows above the band; no cell on the 1% supernumerary floor; adding-up to
+  1.55e-15 (base) and 4.44e-16 (family). The age layer's CU-weighted gamma
+  reproduces the parent on 19,663 of 21,420 (cell, good) pairs; the 1,757
+  that differ do so by a median of $1.13 and at most $1,090.95 (1.61% of
+  that cell's budget).
+- **New gate.** `tests/test_export_heterogeneity.R` in the repo carries
+  fifteen assertions in six families (income profile against neighbouring
+  deciles, band occupancy, across-state dispersion, rank stability of the
+  state ordering, fine expenditure levels, Engel shape and subsistence
+  profile). It fails six on the v1.1 cube and passes 15 of 15 on v1.2.
+- **Still open, recorded rather than repaired.** The decile axis rests on
+  estimates whose split-half replication failed in deciles 1, 2, 3 and 10;
+  the repair treats the two cells where that produced an implausible level,
+  not the instability itself. The CU-weighted subsistence share rises
+  between deciles 7 and 9 (0.180, 0.183, 0.189), inside the gated tolerance.
+
 # lesusa 0.2.0 (2026-09-13)
 
 New data. The package now ships the `frisch_friedman_v1.5.0-tier2` cut (cube
