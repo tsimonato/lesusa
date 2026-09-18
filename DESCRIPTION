@@ -1,7 +1,7 @@
 Package: lesusa
 Title: Stone-Geary (LES) Parameter Database for the United States with
     Exact Aggregation
-Version: 0.3.0
+Version: 0.4.0
 Authors@R:
     person("Thiago", "Simonato", email = "thiago.c.simonato@gmail.com",
            role = c("aut", "cre"))

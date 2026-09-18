@@ -231,6 +231,22 @@ les_aggregate <- function(goods = NULL, regions = NULL, household = NULL,
   # branch above and are excluded here.
   eta_ok <- is.finite(out$eta)
   audit$eta_max     <- if (any(eta_ok)) max(out$eta[eta_ok]) else NA_real_
+  ## spec 079: subsistence is a quantity; a negative one is inadmissible in any
+  ## consumer model that reads this export, and it is what broke the TERM-USA
+  ## graft against lesusa 0.3.0. From cube v1.3 gamma >= 0 holds on every native
+  ## row and aggregation of gamma is additive, so this can only fire on a cube
+  ## built wrong or composed with a stale bound -- which is exactly the failure
+  ## it is here to catch, since the family axis is composed inside this package.
+  neg_g <- which(out$gamma < 0)
+  if (length(neg_g)) {
+    ex <- utils::head(paste0(out$REG[neg_g], "/", out$HH[neg_g], "/",
+                             out$COM[neg_g]), 10L)
+    stop("gamma < 0 in ", length(neg_g), " output cell(s): ",
+         paste(ex, collapse = "; "), if (length(neg_g) > 10L) " ..." else "",
+         ". The shipped tables are not LES-admissible; do not use this export.",
+         call. = FALSE)
+  }
+
   above             <- which(eta_ok & out$eta > ETA_EXPORT)
   audit$n_eta_above <- length(above)
   if (length(above)) {
