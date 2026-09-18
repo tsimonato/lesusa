@@ -130,7 +130,16 @@ compose_fam <- function(les, sup_min = 0.01, tol = 1e-12, max_it = 100L) {
   ## for out of the columns above their floor, in proportion, so the column
   ## total -- and with it the level margin the k-step just pinned -- survives.
   ## Mirrors admissible_split.R (ETA_MAX, floor_columns).
-  LB   <- r_c[cid, , drop = FALSE] * B / ETA_MAX              # per-child bound
+  ## spec 079: the structural bound. gamma = x - beta*SUP, so gamma >= 0 is
+  ## x_fg >= beta_fg * SUP_f, i.e. u >= rw * beta * SUP -- the same bound the
+  ## reference implementation applies (admissible_split.R, GAMMA_FLOOR). It is
+  ## tighter than the eta band, which is kept in the pmax as a no-op guard.
+  ## Without it the package re-composes the family axis with the OLD bound and
+  ## reintroduces negative subsistence on a cube built not to have it: measured
+  ## on the v1.3 cube, 55 negative rows at g16 x usa x q_fam6 while the native
+  ## family cube had none.
+  LB   <- pmax(r_c[cid, , drop = FALSE] * B / ETA_MAX,
+               rw[cid, , drop = FALSE] * B * SUP_c[cid, , drop = FALSE])
   flr  <- pmax(0.01 * x_par, rowSums(LB))
   Xt   <- unlist(lapply(split(seq_along(Xt), cid), function(ix)
     floor_columns(Xt[ix], flr[ix])), use.names = FALSE)[order(order(cid))]
@@ -148,8 +157,13 @@ compose_fam <- function(les, sup_min = 0.01, tol = 1e-12, max_it = 100L) {
     its[j]  <- fit$it
     U[rj, ] <- t(fit$u)
   }
-  if (max(its) > 60L)
-    stop("compose_fam: family RAS needed ", max(its), " passes (> 60).",
+  ## spec 079: the gamma floor is a far tighter bound than the eta band, so many
+  ## more entries sit ON it and the bounded fit needs more sweeps to place the
+  ## residual (measured: 134). The cap is a smoke alarm, not a correctness
+  ## condition -- exactness is gated by the margin checks below and by
+  ## tests/test_export_admissibility.R -- so it is raised, not removed.
+  if (max(its) > 200L)
+    stop("compose_fam: family RAS needed ", max(its), " passes (> 200).",
          call. = FALSE)
 
   w_c <- U / r_c[cid, , drop = FALSE]
@@ -161,6 +175,11 @@ compose_fam <- function(les, sup_min = 0.01, tol = 1e-12, max_it = 100L) {
     stop("compose_fam: eta > ETA_MAX in ", sum(B / w_c > ETA_MAX * (1 + 1e-9)),
          " rows; the bounded RAS did not hold.", call. = FALSE)
   G <- x_c - B * SUP_c[cid, , drop = FALSE]                    # gamma, DERIVED
+  ## The bound above holds u >= lower exactly, so anything below zero here is
+  ## floating-point residue; anything materially below is a defect.
+  if (any(G < -1e-9 * mbar_f[cid]))
+    stop("compose_fam: gamma < 0 in ", sum(G < -1e-9 * mbar_f[cid]), " row(s)")
+  G[G < 0] <- 0
 
   ## -------------------------------------------------------- assemble ------
   par_f <- data.frame(

@@ -1,3 +1,62 @@
+# lesusa 0.4.0 (2026-09-18)
+
+New data. The package ships the `frisch_friedman_v1.7.0-tier2` cut (cube v1.3),
+which supersedes the v1.6.0-tier2 cut (cube v1.2) that 0.3.0 shipped.
+**Parameter values change**: `les_aggregate()` does not return what 0.3.0
+returned. If you built a model on 0.3.0 output, rerun it. No estimation was
+re-run; the Stata NLSUR donors, the tier map and the cell-mass matrix are
+unchanged.
+
+- **Subsistence is non-negative everywhere, by construction.** `gamma >= 0` now
+  holds on every one of the 642,600 native rows and on every output cell of
+  every granularity `les_aggregate()` can express. In 0.3.0 it did not: 10,824
+  of 107,100 rows (10.1%) carried `gamma < 0`, and a downstream GTAP/TERM graft
+  rejected the export because its demand system requires a non-negative
+  subsistence quantity per household and commodity. The 0.2.0/0.3.0 notes called
+  that "not an admissibility violation". For Stone-Geary as a utility function
+  that was defensible — only `x > gamma` is required — but the wording hid a
+  real constraint on consumers and is withdrawn.
+- **Where the negatives came from.** Not from the estimator: the NLSUR
+  parametrises subsistence in logs, so its estimate cannot be negative. Within a
+  cell prices are fixed, so the *levels* of `gamma` are not identified; what is
+  identified is the intercept `a_j = gamma_j - beta_j * Gamma`. The recovery step
+  therefore keeps `a` and re-anchors the level on the calibrated Frisch total
+  `G = mbar(1 + 1/omega)` as `gamma = a + beta * G`. That rule has no boundary,
+  and where `G` falls below the estimator's own subsistence sum a luxury with a
+  small intercept and a large `beta` is pushed through zero.
+- **The rule that replaces it.** On the identified ray the only point with
+  `sum gamma = G` is that same vector, so non-negativity and the calibrated `G`
+  cannot both hold on the ray: any fix leaves it. Of the two candidates
+  implemented and measured, the beta-weighted projection drags 26 goods with
+  *positive* subsistence to zero (apparel, health out-of-pocket, household
+  operations among them) and was rejected; the shipped rule zeros the negative
+  goods and rescales the rest by one common factor, which sends exactly 0
+  positive goods to zero. `beta`, budget shares, `eta`, `omega`, `S`, `M_bar`
+  and the Frisch profile are untouched; only the composition of `gamma` moves,
+  and with it `eps_own`. A good at the floor carries `eps_own = -1` exactly.
+- **What it costs, stated plainly.** In the LES, `gamma_c >= 0` is the same
+  inequality as `eta_c <= M_bar / SUP`: no good may respond to income more
+  strongly than the cell's own Frisch parameter. That ceiling binds hardest
+  where the supernumerary share is largest, so the top deciles lose the most.
+  Maximum `eta` by decile falls from 4.89 across the board to 4.89 (decile 1,
+  where the bound is 3.85) and to 1.42-1.66 in deciles 7-10. Across states
+  within a (decile, good), the standard deviation of `gamma` falls to 57% of
+  v1.2 and of `eta` to 77%. 15,213 of 107,100 rows (14.2%) sit at the floor.
+  Committed expenditure per cell is unchanged to $0.02.
+- **Fewer classifications need `eta_over`.** Over the 178-granularity release
+  sweep, those exporting above the ceiling of 5 fall from **16 to 4** (max 5.47
+  at `g42 x r51 x q_age3`, then 5.17, 5.01, 5.01), because the native income
+  elasticities themselves came down. The aggregation overshoot over the native
+  band moves the other way, 7.2% to 11.9%: exact aggregation weights `beta` by
+  supernumerary mass and `x` by CU mass, and the floor lowers `SUP` where it
+  binds, which widens the gap. `ETA_EXPORT` stays 5 and the default still
+  refuses, so nothing above it reaches a caller silently.
+- **A new hard check.** `les_aggregate()` re-checks `gamma >= 0` on every row it
+  returns and stops, naming the rows, if any is negative. There is no opt-out:
+  unlike `eta_over`, this is not a plausibility band but an admissibility
+  condition. It caught a real defect during development — the family axis is
+  composed inside this package, and its composer still carried the old bound.
+
 # lesusa 0.3.0 (2026-09-14)
 
 New data. The package now ships the `frisch_friedman_v1.6.0-tier2` cut (cube

@@ -2,9 +2,9 @@
 
 **Stone-Geary (LES) demand parameters for the United States, with aggregation that is exact at the base point.**
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue)](NEWS.md)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue)](NEWS.md)
 [![R](https://img.shields.io/badge/R-%E2%89%A5%204.1-276DC3?logo=r)](https://www.r-project.org/)
-[![Release cut](https://img.shields.io/badge/cut-frisch__friedman__v1.6.0--tier2-6f42c1)](#provenance)
+[![Release cut](https://img.shields.io/badge/cut-frisch__friedman__v1.7.0--tier2-6f42c1)](#provenance)
 [![Code](https://img.shields.io/badge/code-MIT-green)](LICENSE)
 [![Data](https://img.shields.io/badge/data-CC%20BY%204.0-green)](LICENSE.md)
 
@@ -96,10 +96,16 @@ fitting. Column `tier` grades every cell by how much survey it rests on: 22 stat
 `share_ipf` carries into the output as a mass-weighted share, so a merged cell tells you how much
 of itself came from that route. Treat high-`share_ipf` groups as model-based, not survey-based.
 
-**Negative `gamma` is legitimate.** It appears on 10.1% of the 107,100 native rows, inherited from
-the donors, and it is not an admissibility violation: a good with no subsistence floor is allowed
-one. What LES actually requires is positive expenditure and a positive supernumerary budget, and
-both hold everywhere: zero of the 107,100 rows carry `x <= 0`, and `eps_own < 0` throughout.
+**Subsistence is non-negative, on every row.** Since cube v1.3 (0.4.0) `gamma >= 0` holds on all
+642,600 native rows and on every output cell `les_aggregate()` can produce; the function re-checks it
+and refuses to return a table that breaks it. Through 0.3.0 it did not hold — 10.1% of native rows
+carried `gamma < 0` — and the note here called that legitimate. For Stone-Geary as a utility function
+it was, since only `x > gamma` is required; but a negative subsistence *quantity* has no reading in
+the CGE demand systems that consume this package, and one of them rejected the 0.3.0 export for
+exactly that reason. The equivalent statement inside the LES is `eta_c <= M_bar / SUP`: no good may
+respond to income more strongly than the cell's own Frisch parameter. That ceiling binds hardest
+where the supernumerary share is largest, so income elasticities in the top deciles are capped near
+1.4-1.7; 14.2% of rows sit at the floor with `eps_own = -1`. See `NEWS.md` for the rule and its cost.
 
 **No standard errors travel with the grid.** Only the state-level subsistence share `S_M` carries
 one, in the `states` table. Aggregated parameters are calibrated quantities, so do not attach
@@ -143,7 +149,7 @@ person count exists by family type and inventing one would be false precision.
 
 ## Provenance
 
-The parameters are release cut `frisch_friedman_v1.6.0-tier2` (cube v1.2). The build script
+The parameters are release cut `frisch_friedman_v1.7.0-tier2` (cube v1.3). The build script
 md5-gates every input against the cut manifest and refuses to run on a drifted file. Checksums
 travel with the data:
 
@@ -162,7 +168,7 @@ les$meta$honesty        # what the numbers do not support
 
 ```bibtex
 Simonato, T. (2026). LES-USA: Stone-Geary parameter database for the United States,
-2017-2019 (frisch_friedman_v1.6.0-tier2) [Data set and R package, version 0.3.0].
+2017-2019 (frisch_friedman_v1.7.0-tier2) [Data set and R package, version 0.4.0].
 https://github.com/tsimonato/lesusa
 ```
 
