@@ -6,11 +6,13 @@
 # RAS/biproportional fitting, NEVER multiply-the-tilt-and-renormalize
 # (CLAUDE.md rule 7 -- the two differ by up to 0.165 in absolute beta).
 #
-# beta is unchanged from v0.8: one RAS against the (w_fq) family margin.
-# gamma is NOT allocated by a dev16 tilt any more. v1.0 transports the
-# subsistence SHARE by a logit tilt levelled per parent cell in dollars, splits
-# the cell budget across goods by a second RAS, and DERIVES gamma = x - beta*SUP.
-# x > 0 and eps_own < 0 then hold by construction rather than by a floor.
+# beta comes from the v0.8 machinery (one RAS against the (w_fq) family
+# margin) and is then, since cube v1.4, CAPPED at x/SUP per child cell so that
+# gamma >= 0 (cap_beta_gamma_floor). gamma is NOT allocated by a dev16 tilt any
+# more. v1.0 transports the subsistence SHARE by a logit tilt levelled per
+# parent cell in dollars, splits the cell budget across goods by a second RAS,
+# and DERIVES gamma = x - beta*SUP. x > 0 and eps_own < 0 then hold by
+# construction rather than by a floor.
 #
 # Returns list(par, cells):
 #   par   642,600 rows: cell_id, fam6, good, beta, gamma
@@ -130,16 +132,16 @@ compose_fam <- function(les, sup_min = 0.01, tol = 1e-12, max_it = 100L) {
   ## for out of the columns above their floor, in proportion, so the column
   ## total -- and with it the level margin the k-step just pinned -- survives.
   ## Mirrors admissible_split.R (ETA_MAX, floor_columns).
-  ## spec 079: the structural bound. gamma = x - beta*SUP, so gamma >= 0 is
-  ## x_fg >= beta_fg * SUP_f, i.e. u >= rw * beta * SUP -- the same bound the
-  ## reference implementation applies (admissible_split.R, GAMMA_FLOOR). It is
-  ## tighter than the eta band, which is kept in the pmax as a no-op guard.
-  ## Without it the package re-composes the family axis with the OLD bound and
-  ## reintroduces negative subsistence on a cube built not to have it: measured
-  ## on the v1.3 cube, 55 negative rows at g16 x usa x q_fam6 while the native
-  ## family cube had none.
-  LB   <- pmax(r_c[cid, , drop = FALSE] * B / ETA_MAX,
-               rw[cid, , drop = FALSE] * B * SUP_c[cid, , drop = FALSE])
+  ## spec 079 / cube v1.4 (decision 2026-09-20): gamma >= 0 is NOT a bound on
+  ## x inside this RAS any more. 0.4.0 (cube v1.3) put it here, as
+  ## u >= rw * beta * SUP, and that moved the split rather than the parameter:
+  ## the column targets were lifted above the observed margin and the family
+  ## RAS no longer settles on a v1.4 cube (321 passes). The floor is imposed
+  ## on beta AFTER the split, at fixed x (cap_beta_gamma_floor below), exactly
+  ## as the reference implementation does. Without the cap the package would
+  ## re-compose the family axis with negative subsistence on a cube built not
+  ## to have it (measured on v1.3: 55 rows at g16 x usa x q_fam6).
+  LB   <- r_c[cid, , drop = FALSE] * B / ETA_MAX
   flr  <- pmax(0.01 * x_par, rowSums(LB))
   Xt   <- unlist(lapply(split(seq_along(Xt), cid), function(ix)
     floor_columns(Xt[ix], flr[ix])), use.names = FALSE)[order(order(cid))]
@@ -157,11 +159,11 @@ compose_fam <- function(les, sup_min = 0.01, tol = 1e-12, max_it = 100L) {
     its[j]  <- fit$it
     U[rj, ] <- t(fit$u)
   }
-  ## spec 079: the gamma floor is a far tighter bound than the eta band, so many
-  ## more entries sit ON it and the bounded fit needs more sweeps to place the
-  ## residual (measured: 134). The cap is a smoke alarm, not a correctness
-  ## condition -- exactness is gated by the margin checks below and by
-  ## tests/test_export_admissibility.R -- so it is raised, not removed.
+  ## The pass cap is a smoke alarm, not a correctness condition -- exactness is
+  ## gated by the margin checks below and by tests/test_export_admissibility.R.
+  ## It was raised from 60 to 200 at 0.4.0, when the gamma floor sat inside the
+  ## RAS as a bound on x; with the floor moved onto beta (0.5.0) the bounded fit
+  ## is the v1.2 one again (band only), so 200 is generous, not tight.
   if (max(its) > 200L)
     stop("compose_fam: family RAS needed ", max(its), " passes (> 200).",
          call. = FALSE)
@@ -174,8 +176,22 @@ compose_fam <- function(les, sup_min = 0.01, tol = 1e-12, max_it = 100L) {
   if (any(B / w_c > ETA_MAX * (1 + 1e-9)))
     stop("compose_fam: eta > ETA_MAX in ", sum(B / w_c > ETA_MAX * (1 + 1e-9)),
          " rows; the bounded RAS did not hold.", call. = FALSE)
+  ## gamma >= 0 at FIXED x (cube v1.4): per child cell cap beta <= x/SUP and
+  ## place the freed mass by one multiplicative lift of eta, clipped at the
+  ## common ceiling mbar/SUP (cap_beta_gamma_floor, ported verbatim from
+  ## admissible_split.R). x, w and the cell budget are untouched, so every
+  ## margin the RAS just closed stays closed; beta is returned CAPPED.
+  Bc <- B
+  for (j in seq_along(rows)) {
+    rj <- rows[[j]]
+    for (f in seq_len(nf))
+      Bc[rj, f] <- cap_beta_gamma_floor(x_c[rj, f], B[rj, f], SUP_c[j, f], w_c[rj, f])
+  }
+  if (any(abs(colSums(Bc[rows[[1L]], , drop = FALSE]) - 1) > 1e-9))
+    stop("compose_fam: adding-up lost in the beta cap", call. = FALSE)
+  B <- Bc
   G <- x_c - B * SUP_c[cid, , drop = FALSE]                    # gamma, DERIVED
-  ## The bound above holds u >= lower exactly, so anything below zero here is
+  ## The cap holds beta <= x/SUP exactly, so anything below zero here is
   ## floating-point residue; anything materially below is a defect.
   if (any(G < -1e-9 * mbar_f[cid]))
     stop("compose_fam: gamma < 0 in ", sum(G < -1e-9 * mbar_f[cid]), " row(s)")
@@ -324,6 +340,45 @@ ETA_MAX <- 4.89
 # cube (eta up to 10) ship without a warning. tests/test_export_admissibility.R
 # asserts this value, so the test and the package cannot drift apart again.
 ETA_EXPORT <- 5
+
+# cap_beta_gamma_floor() -- the gamma floor as a cap on beta at fixed x (cube
+# v1.4, decision 2026-09-20). gamma = x - beta*SUP >= 0 <=> beta <= x/SUP. Goods
+# over the cap are held AT it; the freed mass is placed by ONE multiplicative
+# lift of every good's income elasticity, clipped at the common ceiling:
+#     eta_new = min(ETA_C, lambda * eta),   ETA_C = mbar/SUP = cap_g / w_g,
+# lambda >= 1 the unique root of adding-up. The ceiling is the same for every
+# good in the cell, so the map preserves the within-cell ranking of goods by
+# eta: no free good's eta falls, a capped good sits exactly at the LES bound,
+# a necessity is never lifted above a luxury. Ported verbatim (same numerics)
+# from admissible_split.R so the package composes what the reference composes.
+cap_beta_gamma_floor <- function(xg, beta, SUP, w = NULL, tol = 1e-12) {
+  stopifnot(length(xg) == length(beta), length(SUP) == 1L, SUP > 0,
+            all(is.finite(xg)), all(is.finite(beta)), all(beta > 0), all(xg > 0))
+  cap <- xg / SUP
+  tgt <- sum(beta)
+  if (sum(cap) <= tgt)
+    stop("cap_beta_gamma_floor: infeasible -- sum(x)/SUP = ", signif(sum(cap), 6),
+         " <= sum(beta) = ", signif(tgt, 6), call. = FALSE)
+  if (is.null(w)) w <- xg / sum(xg)
+  stopifnot(all(w > 0), all(cap >= w * (1 - 1e-9)))
+  if (all(beta <= cap * (1 + tol))) return(beta)
+  eta0 <- beta / w
+  f <- function(lam) sum(pmin(cap, w * lam * eta0)) - tgt
+  lam_hi <- max(cap / (w * eta0))     # every good at the ceiling: sum(cap) > tgt
+  if (f(1) > 1e-12 * tgt)
+    stop("cap_beta_gamma_floor: sum over cap at lambda = 1", call. = FALSE)
+  lam <- if (f(1) >= 0) 1 else
+    stats::uniroot(f, c(1, lam_hi), tol = 1e-14, maxiter = 1000L)$root
+  b <- pmin(cap, w * lam * eta0)
+  free <- b < cap * (1 - 1e-9)
+  if (!any(free)) stop("cap_beta_gamma_floor: no free good left", call. = FALSE)
+  b[free] <- b[free] * (1 + (tgt - sum(b)) / sum(b[free]))   # close the root residual
+  if (any(b > cap * (1 + 1e-9)))
+    stop("cap_beta_gamma_floor: did not converge", call. = FALSE)
+  if (abs(sum(b) - tgt) > 1e-9)
+    stop("cap_beta_gamma_floor: adding-up lost", call. = FALSE)
+  b
+}
 
 # floor_columns() -- raise column targets below `flr` to `flr`, paying for it
 # proportionately out of the columns above their floor, until every column is

@@ -22,13 +22,17 @@ suppressPackageStartupMessages(library(data.table))
 
 args <- commandArgs(trailingOnly = TRUE)
 cut_dir <- if (length(args) >= 1) args[[1]] else
-  "release/versions/frisch_friedman_v1.7.0-tier2"
+  "release/versions/frisch_friedman_v1.8.0-tier2"
 out_rds <- if (length(args) >= 2) args[[2]] else
   "release/cge_bridge/inst/extdata/les_usa.rds"
 p_backbone <- "estimation/inputs/cu_group_money_2017_2019.csv"
 p_sidecar  <- "estimation/inputs/axis_sidecar_2017_2019.csv"
 
-# The four state x decile x age files move to v1.2 (spec 077): same schema,
+# The four state x decile x age files move to v1.4 (spec 079, decision
+# 2026-09-20): same schema; gamma >= 0 on every row, imposed as a beta cap at
+# fixed x with one multiplicative, order-preserving lift of eta (v1.3 imposed
+# it on x inside the split and scrambled the state ranking of eta; superseded).
+# Lineage below is unchanged. They moved to v1.2 (spec 077) with the same schema,
 # admissible by construction on every axis, with eta = beta/w banded at 4.89 on
 # every native row, plus the fine regraft (fine expenditure re-closed on the
 # observed layer-0 share) and the precision-triggered donor repair (decision
@@ -41,10 +45,10 @@ p_sidecar  <- "estimation/inputs/axis_sidecar_2017_2019.csv"
 # composed, not what it contains. fdonor is new to the cut: the package derives the family logit
 # tilt and the RAS seed from it, so it can no longer sit in the repo alone.
 CUT_FILES <- c(
-  cube    = "v1.3_les_fine_42good_state_inc10_age5_2017-2019.csv",
-  weights = "v1.3_weight_matrix_state_inc10_age5_2017-2019.csv",
-  mass    = "v1.3_cell_mass_state_inc10_age5_2017-2019.csv",
-  tier    = "v1.3_state_tier_map.csv",
+  cube    = "v1.4_les_fine_42good_state_inc10_age5_2017-2019.csv",
+  weights = "v1.4_weight_matrix_state_inc10_age5_2017-2019.csv",
+  mass    = "v1.4_cell_mass_state_inc10_age5_2017-2019.csv",
+  tier    = "v1.4_state_tier_map.csv",
   ftilt   = "v0.8_fam6_tilt_layer_2017-2019.csv",
   fmarg   = "v0.8_fam6_margins_2017-2019.csv",
   fmass   = "v0.8_cell_mass_state_inc10_age5_fam6_2017-2019.csv",
