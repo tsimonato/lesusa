@@ -1,3 +1,68 @@
+# lesusa 0.5.0 (2026-09-20)
+
+New data. The package ships the `frisch_friedman_v1.8.0-tier2` cut (cube v1.4),
+which supersedes the v1.7.0-tier2 cut (cube v1.3) that 0.4.0 shipped.
+**Parameter values change**: `les_aggregate()` does not return what 0.4.0
+returned. If you built a model on 0.4.0 output, rerun it from the parameter
+build onwards. No estimation was re-run; the Stata NLSUR donors, the national
+decile donor, the tier map and the cell-mass matrix are unchanged
+(byte-identical to 0.4.0).
+
+- **What was wrong with 0.4.0.** `gamma >= 0` was imposed as a lower bound on
+  expenditure *inside* the biproportional split (`x >= beta*SUP`). That moved
+  the split, not the parameter: the column targets were lifted above the
+  observed SAPCE margin and the cube stopped reproducing the shares it is built
+  to reproduce (vehicle purchases at 34% of the top-decile budget against 2%
+  observed; closure error 2.1e-2 where v1.2 had 1e-15). Because the lift was
+  order-blind, household operations -- income elasticity 0.89 at the donor --
+  was pushed to `gamma = 0` in 772 cells with an elasticity of up to 2.37, a
+  number that carries no preference at all, and the state ranking of its
+  elasticity was redrawn from one decile to the next (Spearman rho 0.14 between
+  adjacent deciles). A sweep of the shipped output for anomalies found it
+  (`tests/test_export_heterogeneity.R`, gate H4a); that sweep is now a release
+  gate and 0.4.0 fails it.
+- **The rule that replaces it.** Expenditure is held at the transported share
+  and the floor goes on the marginal budget share: in every cell
+  `beta_g <= x_g / SUP`, and the mass the capped goods give up is placed by
+  **one multiplicative lift of every good's income elasticity, clipped at the
+  common ceiling** -- `eta_new = min(mbar/SUP, lambda * eta)`, `lambda >= 1`
+  the unique root of adding-up. The ceiling is the same for every good in a
+  cell, so the map preserves the within-cell ranking of goods by elasticity: a
+  necessity is never lifted above a luxury, no free good's elasticity falls, a
+  capped good sits exactly at the LES bound. Every RAS margin closes as it did
+  on v1.2; the parent's subsistence total is reproduced up to the cap identity,
+  which the gates close on exactly and the cut ships per row
+  (`v1.4_gamma_floor_cap_*.csv`). Two intermediate rules were tried and
+  rejected on the way -- lifting only the luxuries' excess with a fallback that
+  turned out to fire in 586 of 2,550 cells, and the 0.4.0 rule itself; the
+  decision log has both with their measurements.
+- **What it costs, stated plainly.** The LES identity is unchanged:
+  `gamma_c >= 0 <=> eta_c <= mbar / SUP`, so the top deciles still see the
+  ceiling (maximum `eta` 1.42-1.66 in deciles 7-10). What changes is *who* pays:
+  the whole profile compresses toward the ceiling from below (food 0.45 ->
+  ~0.55 in a top decile where `lambda ~ 1.2`) instead of a few necessities
+  being pushed to zero subsistence. 9,917 of 107,100 base rows (9.3%) sit at
+  the floor with `eps_own = -1` (0.4.0: 15,213, 14.2%). The weakest
+  state-ranking stability of any good across deciles is rho 0.54 (0.4.0:
+  0.14). Committed expenditure per cell is unchanged to $0.02.
+- **The package composer is corrected too.** `les_aggregate()` composes the
+  family axis itself (`compose_fam.R`), and 0.4.0 had wired the x-bound into
+  that RAS as well. On a v1.4 cube that fit does not settle (321 passes), which
+  is how the second copy was caught. The composer now carries the same beta
+  cap at fixed x as the reference implementation (`cap_beta_gamma_floor`,
+  ported verbatim), so the family cube the package returns is the one the cut's
+  `verify_companions.R` reproduces (V15 closes on the cap identity at 7.7e-13).
+- **Exports.** Over the 178-granularity release sweep **no listed
+  classification exports above the ceiling of 5** (0.4.0: 4; 0.3.0: 16); the
+  worst is 4.96 at `g16 x usa x dec_st`, the TERM export granularity. The
+  adversarial two-cell merge still reaches 5.47 on `R04_other_recreation` and
+  is still refused by default. `ETA_EXPORT` stays 5; the `gamma >= 0` hard
+  check on every returned row stays, with no opt-out.
+- **Reproducibility.** Cube v1.3 is not deleted: `LES_CUBE_VERSION=v1.3`
+  regenerates the v1.7.0-tier2 files byte for byte from the same code
+  (`gamma_rule_for("v1.3") == "x"`), so the 0.4.0 numbers remain a checkable
+  record rather than a memory.
+
 # lesusa 0.4.0 (2026-09-18)
 
 New data. The package ships the `frisch_friedman_v1.7.0-tier2` cut (cube v1.3),
