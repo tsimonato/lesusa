@@ -2,9 +2,9 @@
 
 **Stone-Geary (LES) demand parameters for the United States, with aggregation that is exact at the base point.**
 
-[![Version](https://img.shields.io/badge/version-0.6.0-blue)](NEWS.md)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue)](NEWS.md)
 [![R](https://img.shields.io/badge/R-%E2%89%A5%204.1-276DC3?logo=r)](https://www.r-project.org/)
-[![Release cut](https://img.shields.io/badge/cut-frisch__friedman__v1.9.0--tier2-6f42c1)](#provenance)
+[![Release cut](https://img.shields.io/badge/cut-frisch__friedman__v1.10.0--tier2-6f42c1)](#provenance)
 [![Code](https://img.shields.io/badge/code-MIT-green)](LICENSE)
 [![Data](https://img.shields.io/badge/data-CC%20BY%204.0-green)](LICENSE.md)
 
@@ -105,12 +105,11 @@ the CGE demand systems that consume this package, and one of them rejected the 0
 exactly that reason. The equivalent statement inside the LES is `eta_c <= M_bar / SUP`: no good may
 respond to income more strongly than the cell's own Frisch parameter. That ceiling binds hardest
 where the supernumerary share is largest, so income elasticities in the top deciles are capped near
-1.14-1.43; 12.6% of rows sit at the floor with `eps_own = -1`, 8 to 14 of the 42 goods per cell in
-deciles 6-10, and goods at the floor in the same cell carry identical `eta = 1/(1 - S)`. Cube v1.5
-(0.6.0) imposes the floor at the **observed** expenditure everywhere, so the exported budget shares
-are the ones the LES was fitted to (0.4.0 and 0.5.0 were not: both moved `gamma` at fixed `beta` at
-the national donor and shipped vehicle purchases at 33% of the decile-7 budget against 8.6%
-observed; withdrawn). See `NEWS.md` for the rule, the price and the gates that now hold it.
+2.0-2.6 (1.56 in decile 10) under the BRR Frisch profile the release carries since cube v1.6
+(0.7.0); at most 2-3 of the 16 groups touch it in any decile and carry identical `eta = 1/(1 - S)`
+there. The floor is imposed at the **observed** expenditure everywhere, so the exported budget
+shares are the ones the LES was fitted to (0.4.0 and 0.5.0 were not; 0.6.0 had the shares and a
+near-Cobb-Douglas top half from the endogenous Frisch grid; all three withdrawn). See `NEWS.md`.
 
 **No standard errors travel with the grid.** Only the state-level subsistence share `S_M` carries
 one, in the `states` table. Aggregated parameters are calibrated quantities, so do not attach
@@ -154,7 +153,7 @@ person count exists by family type and inventing one would be false precision.
 
 ## Provenance
 
-The parameters are release cut `frisch_friedman_v1.9.0-tier2` (cube v1.5). The build script
+The parameters are release cut `frisch_friedman_v1.10.0-tier2` (cube v1.6). The build script
 md5-gates every input against the cut manifest and refuses to run on a drifted file. Checksums
 travel with the data:
 
@@ -173,7 +172,7 @@ les$meta$honesty        # what the numbers do not support
 
 ```bibtex
 Simonato, T. (2026). LES-USA: Stone-Geary parameter database for the United States,
-2017-2019 (frisch_friedman_v1.9.0-tier2) [Data set and R package, version 0.6.0].
+2017-2019 (frisch_friedman_v1.10.0-tier2) [Data set and R package, version 0.7.0].
 https://github.com/tsimonato/lesusa
 ```
 

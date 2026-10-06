@@ -1,3 +1,67 @@
+# lesusa 0.7.0 (2026-10-05)
+
+**0.6.0 is withdrawn, hours after it shipped.** Its budget shares were right
+and its admissibility gates were green, and in the top half of the income
+distribution it was close to Cobb-Douglas: 7 of the 16 commodity groups a CGE
+reads carried an identical income elasticity (1.14-1.23) in deciles 6-10, and
+every necessity's elasticity was inflated by 1.5-1.75x (food at home 0.44 ->
+0.79 in decile 7). That is not a defect of the floor; it is the LES identity
+`eta <= 1/(1 - S)` evaluated at the subsistence share the release carried,
+S = 0.12-0.19 in deciles 6-10, which came from the endogenous Frisch grid --
+a grid that flags `degenerate_gamma = TRUE` in deciles 2-10. 0.7.0 takes the
+decile Frisch parameter from the corrected BRR panel instead
+(`estimation/outputs/frisch_brr_panel_2017_2019.csv`, reliable standard
+errors): S = 0.53-0.62 in deciles 1-9, 0.36 in decile 10. If you built
+anything on 0.4.0, 0.5.0 or 0.6.0, rerun from the parameter build onwards;
+0.3.0 users should move as well (0.3.0 has `gamma < 0` on 15% of cells).
+
+New data. The package ships the `frisch_friedman_v1.10.0-tier2` cut (cube
+v1.6). No estimation was re-run; the NLSUR donors, the tier map and the
+cell-mass matrix are unchanged.
+
+- **What changed and what did not.** The identified objects -- the intercepts
+  `a_j = gamma_j - beta_j * G` of the estimator, the observed budget shares,
+  `mbar`, every `beta` the estimator produced -- are the same. What changed
+  is the level `G = mbar(1 + 1/omega)` the intercepts are re-anchored on: the
+  swap is `gamma = a + beta * G_new` on the identified ray, so expenditure
+  `x = gamma + beta*(mbar - G)` is unchanged by construction, and then the
+  same `gamma >= 0` cap at the observed expenditure that 0.6.0 introduced.
+  The fitted 16 x 10 budget shares reproduce the calibration matrix to
+  0.009 (0.6.0: 0.007; tolerance 0.020).
+- **What the export looks like now, at the 16 groups x 10 deciles.** Food at
+  home 0.39-0.61 across deciles (0.6.0: 0.32-0.79), housing 0.68-0.97, vehicle
+  purchases 1.6-2.6, recreation 1.2-2.6, household operations 0.74-1.38; the
+  LES ceiling is 2.0-2.6 in deciles 1-9 and 1.56 in decile 10, and at most 2-3
+  groups touch it in any decile (0.6.0: 7). The mass the cap redistributes
+  lifts the free goods' elasticities by 1.2-1.5x (0.6.0: 1.5-1.75x). On the
+  state x decile x age cube 6,829 rows (6.4%) sit at the floor
+  (0.6.0: 13,523); the cap moved `beta` on 1,051 stage-1 rows in 389 of 510 cells
+  (0.6.0: 18,396).
+- **The state and age layers.** The decile profile of S is the parent's and
+  is reproduced exactly per decile; the states' own subsistence shares (mean
+  0.41) set the relative geography, as before, through a level wedge that is
+  now -0.10 instead of +0.09 (the BRR profile sits above the state layer, the
+  grid profile sat below it). Mississippi decile 1 carries S = 0.59 (0.6.0:
+  0.75).
+- **Exports.** Over the 178-granularity release sweep no listed classification exports
+  above the ceiling of 5 (worst 2.97); the worst two-cell merge the
+  adversarial search can build reaches 3.677, and no native cell has a
+  ceiling above 5 any more (max 3.82 at S = 0.74), so the refusal path is
+  exercised on a synthetic cell scaled to S = 0.85. `ETA_EXPORT` stays 5; the
+  `gamma >= 0` hard check on every returned row stays.
+- **Gates.** Every gate of 0.6.0 (fit to the observed shares at four layers,
+  the release invariants, the heterogeneity battery, the 178-classification
+  sweep, T7 here) runs on 0.7.0 under `tests/run_release_gates.R`; the
+  envelopes that encoded the old S profile (the level wedge, the state-target
+  range, the Mississippi-D01 pin, the committed total per decile) are
+  re-measured and pinned on v1.6 with the reasons in the decision log. The
+  state-rank-stability gate (H4a) reads 0.78 on its weakest good (0.6.0: 0.46; floor 0.40); the occupancy of
+  the LES bound is 0.085 over all goods (0.6.0: 0.183), 0.64 for vehicle purchases, whose estimated elasticity of 3.5-4.7 exceeds any ceiling the data admit.
+- **Open.** The Frisch profile is a normalization. The project's paper treats
+  it as one and reports its arms; the released arm is now the BRR panel. The
+  top decile's S of 0.36 (ceiling 1.56) is the lowest in the profile and is
+  where the constraint still binds most.
+
 # lesusa 0.6.0 (2026-10-05)
 
 **0.5.0 and 0.4.0 are withdrawn.** Both ship a cube that does not reproduce
