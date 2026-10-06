@@ -1,3 +1,77 @@
+# lesusa 0.6.0 (2026-10-05)
+
+**0.5.0 and 0.4.0 are withdrawn.** Both ship a cube that does not reproduce
+the budget shares the LES is fitted to. If you built anything on them, rerun
+from the parameter build onwards. 0.3.0 (cube v1.2) was correct on the shares
+and wrong on `gamma >= 0`; 0.6.0 is the first release that is right on both.
+
+New data. The package ships the `frisch_friedman_v1.9.0-tier2` cut (cube v1.5).
+No estimation was re-run; the Stata NLSUR donors, the tier map and the
+cell-mass matrix are unchanged (byte-identical to 0.5.0).
+
+- **The defect, found by a consumer.** A downstream GTAP-TERM project
+  recomputed the 16-group x decile budget shares from the shipped 0.5.0 data
+  (`x = gamma + beta * (M_bar - sum(gamma))`, `share = x / M_bar`,
+  CU-weighted by decile) and compared them with the matrix the LES is
+  calibrated to. Vehicle purchases came out at 33% of the decile-7 budget
+  against 8.6% observed; food at home at 5.4% in decile 10 against 9.2%;
+  40 of 160 cells were off by more than 0.02, up to 27% of a decile's budget
+  misallocated. Their computation was right. The cause sat upstream of
+  everything 0.5.0 had fixed: the national donor had been given `gamma >= 0`
+  by moving `gamma` at fixed `beta` (0.4.0's rule), which moves
+  `x = gamma + beta*SUP` by exactly `delta-gamma` per good. The 0.5.0 fix
+  (the beta cap at fixed `x`) was applied below the donor and faithfully
+  transported a donor that was already wrong. No shipped test read the share
+  matrix; `les_aggregate()`'s own checks (adding-up, signs, `gamma >= 0`,
+  `eta <= 5`) all pass on a cube with the wrong shares, which is why this was
+  not caught here.
+- **The rule that replaces it.** `gamma >= 0` is imposed at the observed
+  expenditure at the donor too: `x = share * mbar` and the calibrated Frisch
+  total are held, `beta_j <= x_j / SUP` is the cap, and the freed mass is
+  placed by one multiplicative, order-preserving lift of every good's income
+  elasticity clipped at the common ceiling -- the same `cap_beta_gamma_floor`
+  0.5.0 used on every child cell, now applied once more, where it was missing.
+  The fitted shares close on the observed matrix to 0.007 (v1.2: 0.012).
+- **The price, stated plainly.** The LES identity is unchanged:
+  `gamma_c >= 0 <=> eta_c <= mbar / SUP`. In deciles 6-10 the calibrated
+  supernumerary share is 0.12-0.30, so every good's income elasticity is
+  capped at 1.14-1.43 and, since the share-weighted mean of `eta` is 1, the
+  whole profile compresses toward that ceiling. 13,523 of 107,100 base rows
+  (12.6%) sit at the floor with `eps_own = -1`; 8 to 14 of the 42 goods per
+  cell in deciles 6-10. By good: vehicle purchases at the bound in 60% of
+  state x decile cells, household operations 41%, furnishings 38%,
+  recreation 36%. **Goods at the bound in the same cell carry identical
+  `eta = 1/(1 - S)` and `eps_own = -1`; a CGE cannot distinguish them, and
+  across states their ordering is the ordering of `S`.** 0.5.0 paid the same
+  price and hid it in the shares; 0.6.0 pays it in `beta`, which is where the
+  constraint lives. Whether the top-decile Frisch calibration that sets the
+  ceiling should be revisited is an open research question, recorded, not a
+  defect of this release.
+- **What moved.** Against 0.5.0, `beta` moved on 96.7% of native rows
+  (max 0.379, vehicle purchases) and `gamma` on 91.9%; committed expenditure
+  per cell is within $11.59 of v1.2 (0.01% of the cell's budget); the
+  national `S` moves in the seventh decimal. Every exported `eta` and
+  `eps_own` changes.
+- **Exports.** Over the 178-granularity release sweep, listed classifications
+  above the ceiling of 5: **none** (0.5.0: none; 0.4.0: 4; 0.3.0: 16); the worst
+  is 4.96 at the TERM granularity, and the worst two-cell merge the adversarial
+  search can build is 4.99 -- below the ceiling, so the sweep exercises the
+  refusal on a synthetic breach. `ETA_EXPORT` stays 5; the `gamma >= 0` hard
+  check on every returned row stays.
+- **The gates that now exist, so this cannot ship again.**
+  `tests/test_fit_observed_shares.R` asserts the fitted shares against the
+  observed matrix at four layers (parent DB, fine donor, cube, and
+  `les_aggregate()` itself) at the v1.2 tolerance; it refuses v1.3 and v1.4.
+  `tests/test_release_invariants.R` asserts every property the release notes
+  claim (`gamma >= 0` on all three axes, committed total per cell, `eps_own`
+  at the floor, per-cell share sanity, one definition of the cap and a
+  byte-level match of this package's port). `tests/run_release_gates.R` runs
+  the whole battery and writes a stamp; `R/release/build_cut.R` and
+  `R/release/build_package.R` refuse to build without it. The package's own
+  export test gained T7, the consumer's computation above.
+- **Reproducibility.** v1.3 and v1.4 regenerate byte for byte from the same
+  code (`LES_CUBE_VERSION=v1.3|v1.4`); they are records, not options.
+
 # lesusa 0.5.0 (2026-09-20)
 
 New data. The package ships the `frisch_friedman_v1.8.0-tier2` cut (cube v1.4),

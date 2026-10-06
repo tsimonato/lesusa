@@ -361,7 +361,9 @@ cap_beta_gamma_floor <- function(xg, beta, SUP, w = NULL, tol = 1e-12) {
          " <= sum(beta) = ", signif(tgt, 6), call. = FALSE)
   if (is.null(w)) w <- xg / sum(xg)
   stopifnot(all(w > 0), all(cap >= w * (1 - 1e-9)))
-  if (all(beta <= cap * (1 + tol))) return(beta)
+  if (all(beta <= cap * (1 + tol))) {
+    return(beta)
+  }
   eta0 <- beta / w
   f <- function(lam) sum(pmin(cap, w * lam * eta0)) - tgt
   lam_hi <- max(cap / (w * eta0))     # every good at the ceiling: sum(cap) > tgt
